@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:gravity="center_horizontal"
+    android:orientation="vertical"
+    android:padding="16dp">
+
+    <androidx.appcompat.widget.Toolbar
+        android:id="@+id/toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:background="?attr/colorPrimary"
+        android:minHeight="?attr/actionBarSize"
+        android:theme="?attr/actionBarTheme" />
+
+    <TextView
+        android:id="@+id/lightStatusLabel"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginBottom="16dp"
+        android:layout_marginTop="16dp"
+        android:text="Light is OFF"
+        android:textSize="18sp" />
+
+    <Switch
+        android:id="@+id/lightSwitch"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:checked="false"
+        android:minHeight="48dp"
+        android:text="Turn on light" />
+
+    <com.airbnb.lottie.LottieAnimationView
+        android:id="@+id/SunriseView"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:visibility="visible"
+        app:lottie_autoPlay="true"
+        app:lottie_loop="true"
+        app:lottie_rawRes="@raw/sunrise_anim" />
+
+    <Button
+        android:id="@+id/Sunrise_Button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="create Sunrise automation" />
+
+    <com.airbnb.lottie.LottieAnimationView
+        android:id="@+id/SunsetView"
+        android:layout_width="match_parent"
+        android:layout_height="80dp"
+        android:visibility="visible"
+        app:lottie_autoPlay="true"
+        app:lottie_clipTextToBoundingBox="false"
+        app:lottie_loop="true"
+        app:lottie_rawRes="@raw/sunset_anim" />
+
+    <Button
+        android:id="@+id/Sunset_Button"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="create Sunset automation" />
+
+</LinearLayout>
+
