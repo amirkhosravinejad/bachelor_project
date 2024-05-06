@@ -10,11 +10,12 @@ public class PortScanner {
         this.localIPAddress = IP;
     }
     public interface PortScanListener {
-        void onPortOpen(String ipAddress);
+        String onPortOpen(String ipAddress);
         void onScanComplete();
     }
 
-    public void scanPortOnNetwork(final int port, final PortScanListener listener) {
+    public String scanPortOnNetwork(final int port, final PortScanListener listener) {
+        StringBuilder server_IP = new StringBuilder();
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -35,7 +36,7 @@ public class PortScanner {
                         socket.connect(new InetSocketAddress(ipAddress, port), 1000);
                         socket.close();
                         if (listener != null) {
-                            listener.onPortOpen(ipAddress);
+                            server_IP.append(listener.onPortOpen(ipAddress));
                         }
                     } catch (IOException e) {
                         // Port is closed
@@ -46,5 +47,6 @@ public class PortScanner {
                 }
             }
         }).start();
+        return server_IP.toString();
     }
 }

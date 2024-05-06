@@ -12,6 +12,7 @@ import android.widget.Toast;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
 import com.android.volley.Response;
 import com.android.volley.VolleyError;
@@ -21,10 +22,15 @@ import com.android.volley.toolbox.Volley;
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.util.HashMap;
+import java.util.Map;
+
 public class LightControlActivity extends AppCompatActivity {
 
     // Update base URL to point to your Flask server
     private String BASE_URL = "http://192.168.36.239:5000";
+
+    private StringBuilder server_ip = new StringBuilder();
     private static final String TAG = LightControlActivity.class.getSimpleName();
     private Switch lightSwitch;
     private TextView lightStatusLabel;
@@ -35,6 +41,7 @@ public class LightControlActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_light_control);
         find_HAServer();
+//        authenticate_HA(IP);
 //        android.net.wifi.WifiManager wifi =
 //                (android.net.wifi.WifiManager)
 //                        getSystemService(android.content.Context.WIFI_SERVICE);
@@ -77,6 +84,7 @@ public class LightControlActivity extends AppCompatActivity {
 
     }
 
+//    @Nullable
     private void find_HAServer() {
         WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
         String IP = Formatter.formatIpAddress(wifiManager.getConnectionInfo().getIpAddress());
@@ -84,18 +92,36 @@ public class LightControlActivity extends AppCompatActivity {
         PortScanner portScanner = new PortScanner(IP);
         portScanner.scanPortOnNetwork(8123, new PortScanner.PortScanListener() {
             @Override
-            public void onPortOpen(String ipAddress) {
-                // Do something when port 8123 is open on a device
+            public String onPortOpen(String ipAddress) {
                 Log.d("zaneto", "Port 8123 is open on device with IP: " + ipAddress);
+                authenticate_HA(ipAddress);
+                server_ip.append(ipAddress);
+                return ipAddress;
+            }
+            @Override
+            public void onScanComplete() {
+                Log.d("zaneto", "Port scan complete");
+            }
+
+        });
+    }
+
+    private void authenticate_HA(String server_ip){
+        HomeAssistantAuthenticator authenticator = new HomeAssistantAuthenticator();
+        authenticator.authenticate(server_ip, "amir-t", "tiop8925",
+                new HomeAssistantAuthenticator.AuthenticationListener() {
+            @Override
+            public void onAuthenticationSuccess(String token) {
+                // Authentication successful, token received
+                Log.d("zaneto", "Authentication successful. Token: " + token);
             }
 
             @Override
-            public void onScanComplete() {
-                // Do something when the scan is complete
-                Log.d("zaneto", "Port scan complete");
+            public void onAuthenticationFailure(String errorMessage) {
+                // Authentication failed
+                Log.e("zaneto", "Authentication failed: " + errorMessage);
             }
         });
-
     }
 
     private void createAutomation(String event) {
@@ -130,12 +156,12 @@ public class LightControlActivity extends AppCompatActivity {
     private void sendRequestLightState(String state) {
         try {
 
-            String lightControlUrl = BASE_URL + "/api/lights/1";
+//            String lightControlUrl = BASE_URL + "/api/lights/1";
+            String lightControlUrl = "http://" + server_ip.toString() + ":8123/api/services/light/turn_" + state;
             JSONObject requestData = new JSONObject();
-            requestData.put("state", lightState);
-
+//            requestData.put("state", lightState);
+            requestData.put("entity_id", "light.virtual_light_1");
             // Update endpoint URL
-
             JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(
                     Request.Method.POST,
                     lightControlUrl,
@@ -158,7 +184,16 @@ public class LightControlActivity extends AppCompatActivity {
                             Toast.makeText(LightControlActivity.this, failed_message, Toast.LENGTH_SHORT).show();
                         }
                     }
-            );
+            ){
+                @Override
+                public Map<String, String> getHeaders() throws AuthFailureError {
+                    Map<String, String> headers = new HashMap<>();
+                    String LONG_LIVED_ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiYzViZDU4ZmYwMTA0YmY3YTNiMjgyNWVkMzBjMWU5MCIsImlhdCI6MTcxMTYzMTk1NywiZXhwIjoyMDI2OTkxOTU3fQ.rbhk4V17LmbmwwUX8iopqLWCdzr71hq8VRrawINEpw0";
+                    headers.put("Authorization", "Bearer " + LONG_LIVED_ACCESS_TOKEN);
+                    headers.put("Content-Type", "application/json");
+                    return headers;
+                }
+            };
 
             // Add the request to the request queue
             Volley.newRequestQueue(this).add(jsonObjectRequest);

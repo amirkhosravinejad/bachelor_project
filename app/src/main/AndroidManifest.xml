@@ -22,7 +22,7 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="30">
 
-        <activity android:name=".LightControlActivity"
+        <activity android:name=".LoginActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
