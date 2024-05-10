@@ -22,13 +22,34 @@
         android:usesCleartextTraffic="true"
         tools:targetApi="30">
 
-        <activity android:name=".LoginActivity"
+        <activity android:name=".FindServersActivity"
             android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <!-- Intent filter for handling callback URL -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="http"
+                    android:host="127.0.0.1"
+                    android:pathPrefix="/hass/auth_callback" />
+            </intent-filter>
+        </activity>
+
+        <activity android:name=".LightControlActivity"
+            android:exported="true">
+
+        </activity>
+
 
     </application>
 

@@ -1,5 +1,7 @@
 package com.api;
 
+import android.util.Log;
+
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.net.Socket;
@@ -30,17 +32,20 @@ public class PortScanner {
 
                 String[] parts = localIpAddress.split("\\.");
                 for (int i = 0; i <= 255; i++) {
-                    final String ipAddress = parts[0] + "." + parts[1] + "." + parts[2] + "." + i;
-                    try {
-                        Socket socket = new Socket();
-                        socket.connect(new InetSocketAddress(ipAddress, port), 1000);
-                        socket.close();
-                        if (listener != null) {
-                            server_IP.append(listener.onPortOpen(ipAddress));
-                        }
-                    } catch (IOException e) {
+//                    for (int j = 0; j <= 255; j++) {
+                        final String ipAddress = parts[0] + "." + parts[1] + "." + parts[2] + "." + i;
+                        try {
+                            Socket socket = new Socket();
+                            Log.d("Port Scanner current address", ipAddress);
+                            socket.connect(new InetSocketAddress(ipAddress, port), 1000);
+                            socket.close();
+                            if (listener != null) {
+                                server_IP.append(listener.onPortOpen(ipAddress));
+                            }
+                        } catch (IOException e) {
                         // Port is closed
-                    }
+                        }
+//                    }
                 }
                 if (listener != null) {
                     listener.onScanComplete();

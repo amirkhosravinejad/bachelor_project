@@ -1,8 +1,7 @@
 package com.api;
 
-import android.net.wifi.WifiManager;
+import android.content.Intent;
 import android.os.Bundle;
-import android.text.format.Formatter;
 import android.util.Log;
 import android.widget.Button;
 import android.widget.Switch;
@@ -24,14 +23,12 @@ import org.json.JSONObject;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 
 public class LightControlActivity extends AppCompatActivity {
 
-    // Update base URL to point to your Flask server
-    private String BASE_URL = "http://192.168.36.239:5000";
-
-    private StringBuilder server_ip = new StringBuilder();
-    private static final String TAG = LightControlActivity.class.getSimpleName();
+    private String server_ip, token;
+    private static final String TAG = "zaneto";
     private Switch lightSwitch;
     private TextView lightStatusLabel;
     private String lightState = "off";
@@ -40,8 +37,7 @@ public class LightControlActivity extends AppCompatActivity {
     protected void onCreate(@Nullable Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_light_control);
-        find_HAServer();
-//        authenticate_HA(IP);
+        handleIntent(getIntent());
 //        android.net.wifi.WifiManager wifi =
 //                (android.net.wifi.WifiManager)
 //                        getSystemService(android.content.Context.WIFI_SERVICE);
@@ -84,48 +80,23 @@ public class LightControlActivity extends AppCompatActivity {
 
     }
 
+    private void handleIntent(Intent intent) {
+        if (intent != null) {
+            server_ip = intent.getStringExtra("server_ip");
+            token = intent.getStringExtra("token");
+            if (server_ip != null && token != null) {
+                Log.d(TAG, "ServerIP: " + server_ip + " token: " + token);
+            } else {
+                Log.e(TAG, "Server IP is null");
+                Toast.makeText(this, "Server IP is null", Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
 //    @Nullable
-    private void find_HAServer() {
-        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
-        String IP = Formatter.formatIpAddress(wifiManager.getConnectionInfo().getIpAddress());
-        Log.d("zaneto", IP);
-        PortScanner portScanner = new PortScanner(IP);
-        portScanner.scanPortOnNetwork(8123, new PortScanner.PortScanListener() {
-            @Override
-            public String onPortOpen(String ipAddress) {
-                Log.d("zaneto", "Port 8123 is open on device with IP: " + ipAddress);
-                authenticate_HA(ipAddress);
-                server_ip.append(ipAddress);
-                return ipAddress;
-            }
-            @Override
-            public void onScanComplete() {
-                Log.d("zaneto", "Port scan complete");
-            }
-
-        });
-    }
-
-    private void authenticate_HA(String server_ip){
-        HomeAssistantAuthenticator authenticator = new HomeAssistantAuthenticator();
-        authenticator.authenticate(server_ip, "amir-t", "tiop8925",
-                new HomeAssistantAuthenticator.AuthenticationListener() {
-            @Override
-            public void onAuthenticationSuccess(String token) {
-                // Authentication successful, token received
-                Log.d("zaneto", "Authentication successful. Token: " + token);
-            }
-
-            @Override
-            public void onAuthenticationFailure(String errorMessage) {
-                // Authentication failed
-                Log.e("zaneto", "Authentication failed: " + errorMessage);
-            }
-        });
-    }
 
     private void createAutomation(String event) {
-        String automationUrl = BASE_URL + "/api/test/automation/" + event;
+        String automationUrl = server_ip + "/api/test/automation/";
         JSONObject requestData = new JSONObject();
         JsonObjectRequest jor = new JsonObjectRequest(
                 Request.Method.POST,
@@ -155,12 +126,10 @@ public class LightControlActivity extends AppCompatActivity {
 
     private void sendRequestLightState(String state) {
         try {
-
-//            String lightControlUrl = BASE_URL + "/api/lights/1";
-            String lightControlUrl = "http://" + server_ip.toString() + ":8123/api/services/light/turn_" + state;
+            String lightControlUrl = "http://" + server_ip + ":8123/api/services/light/turn_" + state;
             JSONObject requestData = new JSONObject();
-//            requestData.put("state", lightState);
             requestData.put("entity_id", "light.virtual_light_1");
+
             // Update endpoint URL
             JsonObjectRequest jsonObjectRequest = new JsonObjectRequest(
                     Request.Method.POST,
@@ -179,17 +148,19 @@ public class LightControlActivity extends AppCompatActivity {
                         @Override
                         public void onErrorResponse(VolleyError error) {
                             // Handle error response
-                            Log.e(TAG, "Error: " + error.toString());
-                            String failed_message = "Failed to turn " + lightState + " the light";
-                            Toast.makeText(LightControlActivity.this, failed_message, Toast.LENGTH_SHORT).show();
+                            String errorCause = Objects.requireNonNull(error.getCause()).toString();
+                            if (!checkIfJSONArrayException(errorCause)) {
+                                Log.e(TAG, "Error: " + error.toString());
+                                String failed_message = "Failed to turn " + lightState + " the light";
+                                Toast.makeText(LightControlActivity.this, failed_message, Toast.LENGTH_SHORT).show();
+                            }
                         }
                     }
             ){
                 @Override
                 public Map<String, String> getHeaders() throws AuthFailureError {
                     Map<String, String> headers = new HashMap<>();
-                    String LONG_LIVED_ACCESS_TOKEN = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJiYzViZDU4ZmYwMTA0YmY3YTNiMjgyNWVkMzBjMWU5MCIsImlhdCI6MTcxMTYzMTk1NywiZXhwIjoyMDI2OTkxOTU3fQ.rbhk4V17LmbmwwUX8iopqLWCdzr71hq8VRrawINEpw0";
-                    headers.put("Authorization", "Bearer " + LONG_LIVED_ACCESS_TOKEN);
+                    headers.put("Authorization", "Bearer " + token);
                     headers.put("Content-Type", "application/json");
                     return headers;
                 }
@@ -199,7 +170,17 @@ public class LightControlActivity extends AppCompatActivity {
             Volley.newRequestQueue(this).add(jsonObjectRequest);
 
         } catch (JSONException e) {
-            e.printStackTrace();
+            Log.d("zaneto", "salap");
         }
     }
+
+    private Boolean checkIfJSONArrayException(String errorCause) {
+        if (errorCause.contains("type org.json.JSONArray cannot be converted to JSONObject")){
+            String success_message = "Light turned " + lightState + " successfully";
+            Toast.makeText(LightControlActivity.this, success_message, Toast.LENGTH_SHORT).show();
+            return true;
+        }
+        return false;
+    }
+
 }
