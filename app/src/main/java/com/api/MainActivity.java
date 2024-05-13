@@ -16,6 +16,8 @@ import android.widget.Toast;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.api.database.TokenDatabaseHelper;
+
 public class MainActivity extends AppCompatActivity {
     private static final String TAG = "zaneto";
     private static final String AUTH_CALLBACK_URL = "http://127.0.0.1:5000/hass/auth_callback";
@@ -31,6 +33,7 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
         progressBar = findViewById(R.id.progressBar);
+
         initWebView();
         handleIntent(getIntent());
     }
@@ -39,6 +42,16 @@ public class MainActivity extends AppCompatActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         handleIntent(intent);
+    }
+
+    private void checkIfTokenExists(){
+        TokenDatabaseHelper dbhelper = new TokenDatabaseHelper(this.getApplicationContext());
+        String [] tokens = dbhelper.getTokenDetails();
+//        if (tokens != null) {
+//            if (dbhelper.isAccessTokenExpired()){
+//
+//            }
+//        }
     }
 
     private void initWebView() {
@@ -68,10 +81,21 @@ public class MainActivity extends AppCompatActivity {
         authenticator.authenticate(serverIP, auth_code,
                 new HomeAssistantAuthenticator.AuthenticationListener() {
                     @Override
-                    public void onAuthenticationSuccess(String token) {
+                    public void onAuthenticationSuccess(String access_token, String refresh_token, long expiry_time) {
                         // Authentication successful, token received
-                        Log.d("zaneto", "Authentication successful. Token: " + token);
-                        onSuccessfulToken(token);
+                        Log.d("zaneto", "Authentication successful. Access token: " + access_token
+                        + " refresh token: " + refresh_token + " expire: " + expiry_time);
+//                        try (TokenDatabaseHelper databaseHelper =
+//                                     new TokenDatabaseHelper(MainActivity.this.getApplicationContext())) {
+//                            databaseHelper.insertTokens(access_token, refresh_token, expiry_time);
+//                            String [] rows;
+//                            rows = databaseHelper.getTokenDetails();
+//                            for (String row:
+//                                 rows) {
+//                                Log.d("zaneto", "tokens: " + row);
+//                            }
+//                        }
+                        onSuccessfulToken(access_token);
                     }
 
                     @Override
@@ -90,7 +114,6 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 progressBar.setVisibility(View.GONE);
-                Log.d(TAG, "salap");
                 Intent toLightControlActivity = new Intent(MainActivity.this, LightControlActivity.class);
                 toLightControlActivity.putExtra("token", token);
                 toLightControlActivity.putExtra("server_ip", serverIP);

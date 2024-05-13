@@ -18,7 +18,7 @@ public class HomeAssistantAuthenticator {
     private String refresh_token;
 
     public interface AuthenticationListener {
-        void onAuthenticationSuccess(String token);
+        void onAuthenticationSuccess(String access_token, String refresh_token, long expiry_time);
         void onAuthenticationFailure(String errorMessage);
     }
 
@@ -43,9 +43,10 @@ public class HomeAssistantAuthenticator {
                     // Checking the response status
                     if (token_response != null) {
                         // Access token and refresh token received successfully
+                        long expiry_time = (System.currentTimeMillis() + 1800);
                         access_token = token_response.optString("access_token");
                         refresh_token = token_response.optString("refresh_token");
-                        listener.onAuthenticationSuccess(access_token);
+                        listener.onAuthenticationSuccess(access_token, refresh_token, expiry_time);
                     } else {
                         // Error occurred
                         listener.onAuthenticationFailure("Failed to obtain tokens");

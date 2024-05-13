@@ -52,8 +52,8 @@ dependencies {
 
     // library in java for supporting zeroconf protocol
 //    implementation(libs.jmdns)
-//    implementation("com.github.xiaogegexiao:rxbonjour:1.0.8")
-
+    implementation("com.squareup.retrofit2:retrofit:2.11.0")
+    implementation("com.squareup.retrofit2:converter-gson:2.11.0")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

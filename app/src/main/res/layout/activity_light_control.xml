@@ -8,13 +8,13 @@
     android:orientation="vertical"
     android:padding="16dp">
 
-    <androidx.appcompat.widget.Toolbar
-        android:id="@+id/toolbar"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="?attr/colorPrimary"
-        android:minHeight="?attr/actionBarSize"
-        android:theme="?attr/actionBarTheme" />
+<!--    <androidx.appcompat.widget.Toolbar-->
+<!--        android:id="@+id/toolbar"-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        android:background="?attr/colorPrimary"-->
+<!--        android:minHeight="?attr/actionBarSize"-->
+<!--        android:theme="?attr/actionBarTheme" />-->
 
     <TextView
         android:id="@+id/lightStatusLabel"
@@ -33,7 +33,12 @@
         android:minHeight="48dp"
         android:text="Turn on light" />
 
-    <com.airbnb.lottie.LottieAnimationView
+<!--    <WebView-->
+<!--        android:id="@+id/automationsWebView"-->
+<!--        android:layout_width="match_parent"-->
+<!--        android:layout_height="match_parent" />-->
+
+        <com.airbnb.lottie.LottieAnimationView
         android:id="@+id/SunriseView"
         android:layout_width="match_parent"
         android:layout_height="80dp"
@@ -65,4 +70,3 @@
         android:text="create Sunset automation" />
 
 </LinearLayout>
-
