@@ -3,12 +3,17 @@ package com.api;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.net.ConnectivityManager;
 import android.net.Network;
 import android.net.NetworkCapabilities;
 import android.net.wifi.WifiInfo;
 import android.net.wifi.WifiManager;
+import android.os.AsyncTask;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.HandlerThread;
 import android.util.Log;
 import android.view.View;
 import android.widget.ArrayAdapter;
@@ -18,10 +23,15 @@ import android.widget.ListView;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 
+import com.api.database.TokenDatabaseHelper;
+
 import java.net.InetAddress;
 import java.net.NetworkInterface;
+import java.net.Socket;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 
 public class FindServersActivity extends AppCompatActivity {
@@ -31,6 +41,11 @@ public class FindServersActivity extends AppCompatActivity {
     private ArrayList<String> serverList;
 
     private ArrayAdapter<String> adapter;
+
+    private HandlerThread handlerThread;
+    private Handler handler;
+    private String former_server_ip;
+    private String refresh_t;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -47,8 +62,10 @@ public class FindServersActivity extends AppCompatActivity {
         // and if it is not try to find Home Assistant server
         if (isVpnActive())
             showWarningPopup();
-        else
-            find_HAServer();
+        else {
+            checkIfTokenExists();
+//            find_HAServer();
+        }
 
         gotoLogin.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -60,6 +77,70 @@ public class FindServersActivity extends AppCompatActivity {
                 startActivity(toMain);
             }
         });
+    }
+
+    private void checkIfTokenExists(){
+        try (TokenDatabaseHelper dbhelper = new TokenDatabaseHelper(this.getApplicationContext())) {
+            SQLiteDatabase db = dbhelper.getReadableDatabase();
+            Cursor cursor = db.rawQuery("SELECT * FROM tokens", null);
+            int count = cursor.getCount();
+            if (count == 0)
+                return;
+            cursor.move(count);
+            former_server_ip = cursor.getString(1);
+            String access_t = cursor.getString(2);
+            refresh_t = cursor.getString(3);
+            String expiry = cursor.getString(4);
+            Log.d("zaneto", "row " + cursor.getPosition() + " serverIP: " + former_server_ip +
+                    " access token: " + access_t + " refresh token: " + refresh_t + " expiry : " + expiry);
+
+            ConnectTask task = new ConnectTask();
+            int return_ = task.execute().get();
+
+            // check if Access Token is still valid or not;
+            // if expired, we should get refresh token
+            // and if it's still valid, we can pass Login and authorization phase.
+            SimpleDateFormat formatter = new SimpleDateFormat("E MMM dd HH:mm:ss 'GMT+03:30' yyyy");
+            Date expiryDate = formatter.parse(expiry);
+            Date new_date = new Date();
+            Log.d("zaneto", "expiry date: " + expiryDate + " now: " + new_date);
+            if (new_date.before(expiryDate)){
+                Log.d("zaneto", "token still valid");
+                intentToLightControl(access_t);
+            }
+            else {
+                Log.d("zaneto", "token not valid anymore!");
+                if (return_ == 0) {
+                    TokenDatabaseHelper helper = new TokenDatabaseHelper(getApplicationContext());
+                    helper.selectAllRows(helper.getReadableDatabase());
+                    HomeAssistantAuthenticator authenticator = new HomeAssistantAuthenticator();
+                    String[] token_row = authenticator.getRefreshToken(former_server_ip, refresh_t);
+                    if (token_row[0] != null && token_row[1] != null && token_row[2] != null){
+                        helper.updateRow(count, token_row[0], token_row[1], token_row[2]);
+                        helper.selectAllRows(helper.getReadableDatabase());
+                        intentToLightControl(token_row[1]);
+                    }
+                    else{
+                        find_HAServer();
+                    }
+
+                }
+            }
+
+        } catch (Exception e){
+            // if there is an exception, means socket is not connected,
+            // so we should find HA servers again.
+            Log.e("zaneto", e.toString());
+            find_HAServer();
+        }
+    }
+
+    private void intentToLightControl(String access_token) {
+        Intent toLightControl = new Intent(FindServersActivity.this, LightControlActivity.class);
+        toLightControl.putExtra("server_ip", former_server_ip);
+        toLightControl.putExtra("token", access_token);
+        // Start LightControlActivity
+        startActivity(toLightControl);
     }
 
     // check if any vpn is on in the host or not.
@@ -78,8 +159,27 @@ public class FindServersActivity extends AppCompatActivity {
     }
 
     private void find_HAServer() {
-//        WifiManager wifiManager = (WifiManager) getApplicationContext().getSystemService(WIFI_SERVICE);
-//        String IP = Formatter.formatIpAddress(wifiManager.getConnectionInfo().getIpAddress());
+        // due to multicast traffic restrictions in Android 8.x and above
+        // we need to acquire multicast lock before starting jmdns
+//        WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
+//        WifiManager.MulticastLock lock = wifiManager.createMulticastLock("mylock");
+//        lock.acquire();
+//
+//        // Initialize HandlerThread
+//        handlerThread = new HandlerThread("FindServersThread");
+//        handlerThread.start();
+//
+//        // Initialize Handler
+//        handler = new Handler(handlerThread.getLooper());
+//        // Start the discovery process in a separate thread
+//        handler.post(new Runnable() {
+//            @Override
+//            public void run() {
+//                Log.d("zaneto", handler.toString());
+//                startDiscovery();
+//            }
+//        });
+
         String IP = getLocalIpAddress();
         Log.d("zaneto", IP);
         PortScanner portScanner = new PortScanner(IP);
@@ -146,8 +246,6 @@ public class FindServersActivity extends AppCompatActivity {
         return null;
     }
 
-
-
     private void showWarningPopup() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Warning")
@@ -161,6 +259,36 @@ public class FindServersActivity extends AppCompatActivity {
                 });
         AlertDialog dialog = builder.create();
         dialog.show();
+    }
+    private class ConnectTask extends AsyncTask<Void, Void, Integer> {
+        private int isConnectedToFormerIP = -1;
+        @Override
+        protected Integer doInBackground(Void... voids) {
+            try {
+                Socket socket = new Socket(former_server_ip, 8123);
+                socket.setSoTimeout(2000);
+                socket.close();
+                Log.d("zaneto", "connection to former server IP was successful.");
+                return 0;
+            } catch (Exception e) {
+                Log.e("zaneto", e.getMessage());
+                return 1;
+            }
+
+        }
+        @Override
+        protected void onPostExecute(Integer result) {
+            super.onPostExecute(result);
+            isConnectedToFormerIP = result;
+        }
+
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        // Don't forget to stop the HandlerThread when the activity is destroyed
+        handlerThread.quitSafely();
     }
 }
 

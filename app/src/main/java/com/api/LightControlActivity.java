@@ -23,7 +23,7 @@ import com.api.dataModel.AutomationData;
 import org.json.JSONException;
 import org.json.JSONObject;
 
-import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Objects;
@@ -151,8 +151,8 @@ public class LightControlActivity extends AppCompatActivity {
         automationData.setDescription("30 minutes after sunrise, the main light is turned off");
         automationData.setMode("single");
         automationData.setAlias(alias);
-        automationData.setTriggers(Arrays.asList(trigger));
-        automationData.setActions(Arrays.asList(action));
+        automationData.setTriggers(Collections.singletonList(trigger));
+        automationData.setActions(Collections.singletonList(action));
         return automationData;
     }
 
@@ -162,9 +162,9 @@ public class LightControlActivity extends AppCompatActivity {
                 .addConverterFactory(GsonConverterFactory.create())
                 .build();
         ApiService apiService = retrofit.create(ApiService.class);
-
-        int randomNumber = new Random().nextInt(10000000) + 1;
         String entity_id = "automation." + automationData.getAlias();
+        int randomNumber = new Random().nextInt(10000000) + 1;
+//        int randomNumber = 3;
         while (checkIfNumberExists(randomNumber, entity_id))
             randomNumber = new Random().nextInt(10000000) + 1;
         Call<AutomationData> call = apiService.createAutomation("Bearer " + token,
@@ -202,7 +202,18 @@ public class LightControlActivity extends AppCompatActivity {
 
                       @Override
                       public void onResponse(JSONObject jsonObject) {
-                          found[0] = true;
+                          try {
+                              JSONObject attrs = (JSONObject) jsonObject.get("attributes");
+                              Integer id = (Integer) attrs.get("id");
+                              if (randomNumber == id){
+                                  Log.d(TAG, "random number "+ randomNumber + "exists");
+                                  found[0] = true;
+                              }
+
+                          } catch (Exception e) {
+                              Log.d(TAG, "some exception occurred.");
+                              found[0] = false;
+                          }
 
                       }
                   },
@@ -256,7 +267,7 @@ public class LightControlActivity extends AppCompatActivity {
                             // Handle error response
                             String errorCause = Objects.requireNonNull(error.getCause()).toString();
                             if (!checkIfJSONArrayException(errorCause)) {
-                                Log.e(TAG, "Error: " + error.toString());
+                                Log.e(TAG, "Error: " + error);
                                 String failed_message = "Failed to turn " + lightState + " the light";
                                 Toast.makeText(LightControlActivity.this, failed_message, Toast.LENGTH_SHORT).show();
                             }

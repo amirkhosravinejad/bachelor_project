@@ -7,7 +7,7 @@ import java.net.InetSocketAddress;
 import java.net.Socket;
 
 public class PortScanner {
-    private String localIPAddress;
+    private final String localIPAddress;
     public PortScanner (String IP){
         this.localIPAddress = IP;
     }

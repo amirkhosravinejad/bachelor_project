@@ -25,7 +25,7 @@ public class MainActivity extends AppCompatActivity {
 
     private String serverIP;
     private WebView webView;
-    private Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private ProgressBar progressBar;
 
     @Override
@@ -42,16 +42,6 @@ public class MainActivity extends AppCompatActivity {
     protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
         handleIntent(intent);
-    }
-
-    private void checkIfTokenExists(){
-        TokenDatabaseHelper dbhelper = new TokenDatabaseHelper(this.getApplicationContext());
-        String [] tokens = dbhelper.getTokenDetails();
-//        if (tokens != null) {
-//            if (dbhelper.isAccessTokenExpired()){
-//
-//            }
-//        }
     }
 
     private void initWebView() {
@@ -81,20 +71,14 @@ public class MainActivity extends AppCompatActivity {
         authenticator.authenticate(serverIP, auth_code,
                 new HomeAssistantAuthenticator.AuthenticationListener() {
                     @Override
-                    public void onAuthenticationSuccess(String access_token, String refresh_token, long expiry_time) {
+                    public void onAuthenticationSuccess(String access_token, String refresh_token, String expiry_time) {
                         // Authentication successful, token received
                         Log.d("zaneto", "Authentication successful. Access token: " + access_token
                         + " refresh token: " + refresh_token + " expire: " + expiry_time);
-//                        try (TokenDatabaseHelper databaseHelper =
-//                                     new TokenDatabaseHelper(MainActivity.this.getApplicationContext())) {
-//                            databaseHelper.insertTokens(access_token, refresh_token, expiry_time);
-//                            String [] rows;
-//                            rows = databaseHelper.getTokenDetails();
-//                            for (String row:
-//                                 rows) {
-//                                Log.d("zaneto", "tokens: " + row);
-//                            }
-//                        }
+                        try (TokenDatabaseHelper databaseHelper =
+                                     new TokenDatabaseHelper(MainActivity.this.getApplicationContext())) {
+                            databaseHelper.insertTokens(serverIP, access_token, refresh_token, expiry_time);
+                        }
                         onSuccessfulToken(access_token);
                     }
 
