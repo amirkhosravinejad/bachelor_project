@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
 
 public class FindServersActivity extends AppCompatActivity {
     private String server_ip;
@@ -61,7 +62,7 @@ public class FindServersActivity extends AppCompatActivity {
         // check if VPN active; if it's active, show the popup
         // and if it is not try to find Home Assistant server
         if (isVpnActive())
-            showWarningPopup();
+            showVPNWarningPopup();
         else {
             checkIfTokenExists();
 //            find_HAServer();
@@ -145,7 +146,8 @@ public class FindServersActivity extends AppCompatActivity {
 
     // check if any vpn is on in the host or not.
     private boolean isVpnActive() {
-        ConnectivityManager connectivityManager = (ConnectivityManager) this.getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
+        ConnectivityManager connectivityManager = (ConnectivityManager)
+                this.getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
         if (connectivityManager!= null) {
             Network activeNetwork = connectivityManager.getActiveNetwork();
             if (activeNetwork!= null) {
@@ -159,51 +161,21 @@ public class FindServersActivity extends AppCompatActivity {
     }
 
     private void find_HAServer() {
-        // due to multicast traffic restrictions in Android 8.x and above
-        // we need to acquire multicast lock before starting jmdns
-//        WifiManager wifiManager = (WifiManager) getSystemService(Context.WIFI_SERVICE);
-//        WifiManager.MulticastLock lock = wifiManager.createMulticastLock("mylock");
-//        lock.acquire();
-//
-//        // Initialize HandlerThread
-//        handlerThread = new HandlerThread("FindServersThread");
-//        handlerThread.start();
-//
-//        // Initialize Handler
-//        handler = new Handler(handlerThread.getLooper());
-//        // Start the discovery process in a separate thread
-//        handler.post(new Runnable() {
-//            @Override
-//            public void run() {
-//                Log.d("zaneto", handler.toString());
-//                startDiscovery();
-//            }
-//        });
-
-        String IP = getLocalIpAddress();
-        Log.d("zaneto", IP);
-        PortScanner portScanner = new PortScanner(IP);
-        portScanner.scanPortOnNetwork(8123, new PortScanner.PortScanListener() {
-            @Override
-            public String onPortOpen(String ipAddress) {
-                Log.d("zaneto", "Port 8123 is open on device with IP: " + ipAddress);
-                // Run UI updates on the main thread
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        server_ip = ipAddress;
-                        serverList.add(server_ip);
-                        adapter.notifyDataSetChanged();
-                    }
-                });
-                return ipAddress;
+        try {
+            ZeroconfDiscoveryTask discoveryTask = new ZeroconfDiscoveryTask();
+            String host = discoveryTask.execute().get();
+            if (discoveryTask.hostName == null)
+                runPortScanner();
+            else {
+                server_ip = discoveryTask.hostName;
+                Log.d("zaneto", "host: " + host);
             }
-            @Override
-            public void onScanComplete() {
-                Log.d("zaneto", "Port scan complete");
-            }
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
+        } catch (InterruptedException e) {
+            throw new RuntimeException(e);
+        }
 
-        });
     }
 
     private String getLocalIpAddress() {
@@ -246,10 +218,36 @@ public class FindServersActivity extends AppCompatActivity {
         return null;
     }
 
-    private void showWarningPopup() {
+    private void runPortScanner() {
+        String IP = getLocalIpAddress();
+        Log.d("zaneto", IP);
+        PortScanner portScanner = new PortScanner(IP);
+        portScanner.scanPortOnNetwork(8123, new PortScanner.PortScanListener() {
+            @Override
+            public String onPortOpen(String ipAddress) {
+                Log.d("zaneto", "Port 8123 is open on device with IP: " + ipAddress);
+                // Run UI updates on the main thread
+                runOnUiThread(new Runnable() {
+                    @Override
+                    public void run() {
+                        server_ip = ipAddress;
+                        serverList.add(server_ip);
+                        adapter.notifyDataSetChanged();
+                    }
+                });
+                return ipAddress;
+            }
+            @Override
+            public void onScanComplete() {
+                Log.d("zaneto", "Port scan complete");
+            }
+
+        });
+    }
+    private void showVPNWarningPopup() {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Warning")
-                .setMessage("Please make sure your mobile is connected to the same network with your server and no VPN is on.")
+                .setMessage("Please make sure no VPN is on.")
                 .setPositiveButton("OK", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
@@ -282,6 +280,21 @@ public class FindServersActivity extends AppCompatActivity {
             isConnectedToFormerIP = result;
         }
 
+    }
+
+    private class ZeroconfDiscoveryTask extends AsyncTask<Void, Void, String>{
+        private String hostName;
+        @Override
+        protected String doInBackground(Void... voids) {
+            mDNSServiceDiscovery mDNSServiceDiscovery = new mDNSServiceDiscovery(getApplicationContext());
+            String host = mDNSServiceDiscovery.getHostAndPort();
+            return host;
+        }
+        @Override
+        protected void onPostExecute(String result) {
+            super.onPostExecute(result);
+            hostName = result;
+        }
     }
 
     @Override
