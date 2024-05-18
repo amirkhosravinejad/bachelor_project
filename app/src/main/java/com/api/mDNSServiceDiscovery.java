@@ -9,11 +9,11 @@ import android.util.Log;
 
 public class mDNSServiceDiscovery {
     private final String TAG = "bach-prj";
-    private NsdManager nsdManager;
+    private final NsdManager nsdManager;
     private final long TIME_OUT = 10000;
-    private Handler handler = new Handler(Looper.getMainLooper());
+    private final Handler handler = new Handler(Looper.getMainLooper());
     private boolean discoveryCompleted = false;
-    private OnHostnameListener listener;
+    private final OnHostnameListener listener;
     public interface OnHostnameListener {
         void onHostnameFound(String hostname);
         void onHostnameNotFound();
