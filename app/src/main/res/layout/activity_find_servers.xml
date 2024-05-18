@@ -4,20 +4,67 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:gravity="center_horizontal"
     android:orientation="vertical"
     android:padding="16dp"
     tools:ignore="VisualLintBounds">
 
-    <ListView
-        android:id="@+id/serverListView"
+    <ImageView
+        android:id="@+id/imageView"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="20dp"
+        android:contentDescription="Home Assistant Logo"
+        app:srcCompat="@drawable/app_logo" />
+
+    <FrameLayout
+        android:id="@+id/searchArea"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="20dp"
+        android:background="@drawable/rounded_rectangle"
+        android:clickable="true"
+        android:elevation="4dp"
+        android:focusable="true"
+        android:minHeight="40dp">
+
+        <TextView
+            android:id="@+id/welcomeMessage"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:gravity="center"
+            android:text="@string/Welcome_message_string"
+            android:textAppearance="?attr/textAppearanceHeadline6"
+            android:textColor="@color/teal_700"
+            android:textSize="20sp" />
+    </FrameLayout>
+
+    <com.airbnb.lottie.LottieAnimationView
+        android:id="@+id/SearchAnimationView"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="20dp"
+        android:layout_marginBottom="20dp"
+        android:scaleX="2.8"
+        android:scaleY="1.9"
+        android:visibility="visible"
+        app:lottie_autoPlay="true"
+        app:lottie_clipTextToBoundingBox="false"
+        app:lottie_loop="true"
+        app:lottie_rawRes="@raw/search_anim" />
 
     <Button
         android:id="@+id/GotoLogin"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
-        android:text="Head to Login" />
+        android:layout_marginTop="20dp"
+        android:background="@drawable/rounded_rectangle"
+        android:text="@string/head_to_login"
+        android:textSize="24sp"
+        android:visibility="visible" />
 
 </LinearLayout>

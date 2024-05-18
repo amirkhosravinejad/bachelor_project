@@ -19,7 +19,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.api.database.TokenDatabaseHelper;
 
 public class MainActivity extends AppCompatActivity {
-    private static final String TAG = "zaneto";
+    private static final String TAG = "bach-prj";
     private static final String AUTH_CALLBACK_URL = "http://127.0.0.1:5000/hass/auth_callback";
     private static final String AUTH_URL_FORMAT = "http://%s:8123/auth/authorize?client_id=http://127.0.0.1:5000&redirect_uri=%s";
 
@@ -73,7 +73,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onAuthenticationSuccess(String access_token, String refresh_token, String expiry_time) {
                         // Authentication successful, token received
-                        Log.d("zaneto", "Authentication successful. Access token: " + access_token
+                        Log.d("bach-prj", "Authentication successful. Access token: " + access_token
                         + " refresh token: " + refresh_token + " expire: " + expiry_time);
                         try (TokenDatabaseHelper databaseHelper =
                                      new TokenDatabaseHelper(MainActivity.this.getApplicationContext())) {
@@ -85,7 +85,7 @@ public class MainActivity extends AppCompatActivity {
                     @Override
                     public void onAuthenticationFailure(String errorMessage) {
                         // Authentication failed
-                        Log.e("zaneto", "Authentication failed: " + errorMessage);
+                        Log.e("bach-prj", "Authentication failed: " + errorMessage);
                     }
                 });
     }

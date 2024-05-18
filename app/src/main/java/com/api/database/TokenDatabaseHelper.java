@@ -57,10 +57,10 @@ public class TokenDatabaseHelper extends SQLiteOpenHelper {
         // Check if the insertion was successful
         if (newRowId!= -1) {
             // Insertion was successful
-            Log.d("zaneto", "new row inserted in rowID " + newRowId);
+            Log.d("bach-prj", "new row inserted in rowID " + newRowId);
         } else {
             // Insertion failed
-            Log.d("zaneto", "insertion to db failed");
+            Log.d("bach-prj", "insertion to db failed");
         }
         selectAllRows(db);
         db.close();
@@ -78,8 +78,8 @@ public class TokenDatabaseHelper extends SQLiteOpenHelper {
                 String access_t = cursor.getString(2);
                 String refresh_t = cursor.getString(3);
                 String expiry = cursor.getString(4);
-//                Log.d("zaneto", String.valueOf(new Date()));
-                Log.d("zaneto", "row " + cursor.getPosition() + " serverIP: " + server_ip +
+//                Log.d("bach-prj", String.valueOf(new Date()));
+                Log.d("bach-prj", "row " + cursor.getPosition() + " serverIP: " + server_ip +
                     " access token: " + access_t + " refresh token: " + refresh_t + " expiry : " + expiry);
             } while (cursor.moveToNext());
             // moving our cursor to next.

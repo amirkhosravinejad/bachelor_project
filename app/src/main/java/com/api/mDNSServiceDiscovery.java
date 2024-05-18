@@ -3,23 +3,34 @@ package com.api;
 import android.content.Context;
 import android.net.nsd.NsdManager;
 import android.net.nsd.NsdServiceInfo;
+import android.os.Handler;
+import android.os.Looper;
 import android.util.Log;
 
 public class mDNSServiceDiscovery {
-    private final String TAG = "zaneto";
+    private final String TAG = "bach-prj";
     private NsdManager nsdManager;
-    private StringBuilder host;
-    public mDNSServiceDiscovery (Context context) {
+    private final long TIME_OUT = 10000;
+    private Handler handler = new Handler(Looper.getMainLooper());
+    private boolean discoveryCompleted = false;
+    private OnHostnameListener listener;
+    public interface OnHostnameListener {
+        void onHostnameFound(String hostname);
+        void onHostnameNotFound();
+    }
+    public mDNSServiceDiscovery (Context context, OnHostnameListener listener) {
+        this.listener = listener;
         nsdManager = (NsdManager) context.getSystemService(Context.NSD_SERVICE);
         String serviceType = "_home-assistant._tcp";
         nsdManager.discoverServices(serviceType, NsdManager.PROTOCOL_DNS_SD, discoveryListener);
-        host = new StringBuilder();
     }
     private final NsdManager.DiscoveryListener discoveryListener = new NsdManager.DiscoveryListener() {
         @Override
         public void onDiscoveryStarted(String regType) {
             // Discovery has started
             Log.d(TAG, "Discovery started.");
+            discoveryCompleted = false; // Reset the flag since discovery might still find services
+            checkTimeoutAfterServiceDiscovery(); // Start the timeout
         }
 
         @Override
@@ -37,11 +48,11 @@ public class mDNSServiceDiscovery {
                 public void onServiceResolved(NsdServiceInfo serviceInfo) {
                     // Service resolved successfully
                     Log.d(TAG, "Service resolved: " + serviceInfo.getServiceName());
-                    String hostName = serviceInfo.getHost().getHostName();
+                    listener.onHostnameFound(serviceInfo.getHost().getHostName());
                     int port = serviceInfo.getPort();
-                    host.append(hostName);
-                    Log.d(TAG, "Host: " + host);
+                    Log.d(TAG, "Host: " + serviceInfo.getHost().getHostName());
                     Log.d(TAG, "Port: " + port);
+                    discoveryCompleted = true; // Mark discovery as completed
                 }
 
             });
@@ -51,6 +62,8 @@ public class mDNSServiceDiscovery {
         public void onServiceLost(NsdServiceInfo service) {
             // A service was lost; update state as necessary
             Log.d(TAG, "service lost ");
+            discoveryCompleted = true; // Mark discovery as completed
+            listener.onHostnameNotFound();
         }
 
         @Override
@@ -73,7 +86,11 @@ public class mDNSServiceDiscovery {
 
     };
 
-    public String getHostAndPort() {
-        return host.toString();
+    private void checkTimeoutAfterServiceDiscovery(){
+        handler.postDelayed(() -> {
+            if (!discoveryCompleted) {
+                listener.onHostnameNotFound();
+            }
+        }, TIME_OUT); // Use the existing TIMEOUT value
     }
 }

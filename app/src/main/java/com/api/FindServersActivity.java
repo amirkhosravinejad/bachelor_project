@@ -16,9 +16,8 @@ import android.os.Handler;
 import android.os.HandlerThread;
 import android.util.Log;
 import android.view.View;
-import android.widget.ArrayAdapter;
 import android.widget.Button;
-import android.widget.ListView;
+import android.widget.TextView;
 
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -29,35 +28,51 @@ import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.Socket;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.concurrent.ExecutionException;
 
-public class FindServersActivity extends AppCompatActivity {
-    private String server_ip;
+public class FindServersActivity extends AppCompatActivity implements mDNSServiceDiscovery.OnHostnameListener {
+
     private Button gotoLogin;
-    private ListView serverListView;
-    private ArrayList<String> serverList;
 
-    private ArrayAdapter<String> adapter;
+    private TextView welcomeMessage;
 
+    private View searchAnimationView;
+    private String server_ip;
     private HandlerThread handlerThread;
     private Handler handler;
     private String former_server_ip;
     private String refresh_t;
 
     @Override
+    public void onHostnameFound(String hostname) {
+        Log.d("bach-prj", "host: " + hostname);
+        server_ip = hostname;
+        gotoLogin.setVisibility(View.VISIBLE);
+        searchAnimationView.setVisibility(View.INVISIBLE);
+    }
+    @Override
+    public void onHostnameNotFound() {
+        runPortScanner();
+        gotoLogin.setVisibility(View.VISIBLE);
+        searchAnimationView.setVisibility(View.INVISIBLE);
+    }
+    @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_find_servers);
         gotoLogin = findViewById(R.id.GotoLogin);
-        serverListView = findViewById(R.id.serverListView);
-        serverList = new ArrayList<>();
+        searchAnimationView = findViewById(R.id.SearchAnimationView);
+        gotoLogin.setVisibility(View.GONE);
+        searchAnimationView.setVisibility(View.VISIBLE);
 
-        adapter = new ArrayAdapter<>(this, android.R.layout.simple_list_item_1, serverList);
-        serverListView.setAdapter(adapter);
+        // Initially hide the Button
+        findViewById(R.id.GotoLogin).setVisibility(View.GONE);
+
+        // Show the welcome message
+        welcomeMessage = findViewById(R.id.welcomeMessage);
+        welcomeMessage.setVisibility(View.VISIBLE);
 
         // check if VPN active; if it's active, show the popup
         // and if it is not try to find Home Assistant server
@@ -68,10 +83,10 @@ public class FindServersActivity extends AppCompatActivity {
 //            find_HAServer();
         }
 
+
         gotoLogin.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-
                 Intent toMain = new Intent(FindServersActivity.this, MainActivity.class);
                 toMain.putExtra("server_ip", server_ip);
                 // Start MainActivity
@@ -92,7 +107,7 @@ public class FindServersActivity extends AppCompatActivity {
             String access_t = cursor.getString(2);
             refresh_t = cursor.getString(3);
             String expiry = cursor.getString(4);
-            Log.d("zaneto", "row " + cursor.getPosition() + " serverIP: " + former_server_ip +
+            Log.d("bach-prj", "row " + cursor.getPosition() + " serverIP: " + former_server_ip +
                     " access token: " + access_t + " refresh token: " + refresh_t + " expiry : " + expiry);
 
             ConnectTask task = new ConnectTask();
@@ -104,13 +119,13 @@ public class FindServersActivity extends AppCompatActivity {
             SimpleDateFormat formatter = new SimpleDateFormat("E MMM dd HH:mm:ss 'GMT+03:30' yyyy");
             Date expiryDate = formatter.parse(expiry);
             Date new_date = new Date();
-            Log.d("zaneto", "expiry date: " + expiryDate + " now: " + new_date);
+            Log.d("bach-prj", "expiry date: " + expiryDate + " now: " + new_date);
             if (new_date.before(expiryDate)){
-                Log.d("zaneto", "token still valid");
+                Log.d("bach-prj", "token still valid");
                 intentToLightControl(access_t);
             }
             else {
-                Log.d("zaneto", "token not valid anymore!");
+                Log.d("bach-prj", "token not valid anymore!");
                 if (return_ == 0) {
                     TokenDatabaseHelper helper = new TokenDatabaseHelper(getApplicationContext());
                     helper.selectAllRows(helper.getReadableDatabase());
@@ -131,7 +146,7 @@ public class FindServersActivity extends AppCompatActivity {
         } catch (Exception e){
             // if there is an exception, means socket is not connected,
             // so we should find HA servers again.
-            Log.e("zaneto", e.toString());
+            Log.e("bach-prj", e.toString());
             find_HAServer();
         }
     }
@@ -161,21 +176,8 @@ public class FindServersActivity extends AppCompatActivity {
     }
 
     private void find_HAServer() {
-        try {
-            ZeroconfDiscoveryTask discoveryTask = new ZeroconfDiscoveryTask();
-            String host = discoveryTask.execute().get();
-            if (discoveryTask.hostName == null)
-                runPortScanner();
-            else {
-                server_ip = discoveryTask.hostName;
-                Log.d("zaneto", "host: " + host);
-            }
-        } catch (ExecutionException e) {
-            throw new RuntimeException(e);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        }
-
+        mDNSServiceDiscovery mDNSDiscovery = new mDNSServiceDiscovery(this, this);
+        Log.d("bach-prj", "we're in finally after try catch in findHAServer()");
     }
 
     private String getLocalIpAddress() {
@@ -202,7 +204,7 @@ public class FindServersActivity extends AppCompatActivity {
             List<NetworkInterface> interfaces = Collections.list(NetworkInterface.getNetworkInterfaces());
             for (NetworkInterface intf : interfaces) {
                 if (intf.isUp())
-                    Log.d("zaneto", "interface name: " + intf.getDisplayName());
+                    Log.d("bach-prj", "interface name: " + intf.getDisplayName());
                 if (intf.getName().equalsIgnoreCase("wlan0") ||
                         intf.getName().equalsIgnoreCase("swlan0")) {
 
@@ -220,26 +222,27 @@ public class FindServersActivity extends AppCompatActivity {
 
     private void runPortScanner() {
         String IP = getLocalIpAddress();
-        Log.d("zaneto", IP);
+        Log.d("bach-prj", IP);
         PortScanner portScanner = new PortScanner(IP);
         portScanner.scanPortOnNetwork(8123, new PortScanner.PortScanListener() {
             @Override
             public String onPortOpen(String ipAddress) {
-                Log.d("zaneto", "Port 8123 is open on device with IP: " + ipAddress);
+                Log.d("bach-prj", "Port 8123 is open on device with IP: " + ipAddress);
+                server_ip = ipAddress;
                 // Run UI updates on the main thread
-                runOnUiThread(new Runnable() {
-                    @Override
-                    public void run() {
-                        server_ip = ipAddress;
-                        serverList.add(server_ip);
-                        adapter.notifyDataSetChanged();
-                    }
-                });
+//                runOnUiThread(new Runnable() {
+//                    @Override
+//                    public void run() {
+//                        server_ip = ipAddress;
+////                        serverList.add(server_ip);
+////                        adapter.notifyDataSetChanged();
+//                    }
+//                });
                 return ipAddress;
             }
             @Override
             public void onScanComplete() {
-                Log.d("zaneto", "Port scan complete");
+                Log.d("bach-prj", "Port scan complete");
             }
 
         });
@@ -258,6 +261,8 @@ public class FindServersActivity extends AppCompatActivity {
         AlertDialog dialog = builder.create();
         dialog.show();
     }
+
+
     private class ConnectTask extends AsyncTask<Void, Void, Integer> {
         private int isConnectedToFormerIP = -1;
         @Override
@@ -266,10 +271,10 @@ public class FindServersActivity extends AppCompatActivity {
                 Socket socket = new Socket(former_server_ip, 8123);
                 socket.setSoTimeout(2000);
                 socket.close();
-                Log.d("zaneto", "connection to former server IP was successful.");
+                Log.d("bach-prj", "connection to former server IP was successful.");
                 return 0;
             } catch (Exception e) {
-                Log.e("zaneto", e.getMessage());
+                Log.e("bach-prj", e.getMessage());
                 return 1;
             }
 
@@ -280,21 +285,6 @@ public class FindServersActivity extends AppCompatActivity {
             isConnectedToFormerIP = result;
         }
 
-    }
-
-    private class ZeroconfDiscoveryTask extends AsyncTask<Void, Void, String>{
-        private String hostName;
-        @Override
-        protected String doInBackground(Void... voids) {
-            mDNSServiceDiscovery mDNSServiceDiscovery = new mDNSServiceDiscovery(getApplicationContext());
-            String host = mDNSServiceDiscovery.getHostAndPort();
-            return host;
-        }
-        @Override
-        protected void onPostExecute(String result) {
-            super.onPostExecute(result);
-            hostName = result;
-        }
     }
 
     @Override

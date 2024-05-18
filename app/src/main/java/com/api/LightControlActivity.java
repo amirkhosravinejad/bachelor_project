@@ -18,7 +18,7 @@ import com.android.volley.Response;
 import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
-import com.api.dataModel.AutomationData;
+import com.api.datamodel.AutomationData;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -40,7 +40,7 @@ import retrofit2.http.Path;
 
 public class LightControlActivity extends AppCompatActivity {
     private String server_ip, token;
-    private static final String TAG = "zaneto";
+    private static final String TAG = "bach-prj";
     private Switch lightSwitch;
     private TextView lightStatusLabel;
     private String lightState = "off";
@@ -49,11 +49,9 @@ public class LightControlActivity extends AppCompatActivity {
     public interface ApiService {
         @POST("api/config/automation/config/{randomNumber}")
         Call<AutomationData> createAutomation(@Header("Authorization") String token,
-                                              @Header("Content-Type") String contentType, @Body AutomationData automationData,
+                                              @Header("Content-Type") String contentType,
+                                              @Body AutomationData automationData,
                                               @Path("randomNumber") int randomNumber);
-//        @GET("api/states")
-//        Call<> checkIfC
-
     }
     @Override
     protected void onCreate(@Nullable Bundle savedInstanceState) {
@@ -92,15 +90,6 @@ public class LightControlActivity extends AppCompatActivity {
 
         SunsetButton.setOnClickListener(view -> createAutomation("sunset"));
         SunriseButton.setOnClickListener(view -> createAutomation("sunrise"));
-
-//        UdpBroadcastClient udp_client = new UdpBroadcastClient();
-//        udp_client.discoverHomeAssistantServer();
-
-        // Initialize NetworkDiscovery
-//        networkDiscovery = new NetworkDiscovery();
-//        // Start service discovery
-//        networkDiscovery.discoverServer();
-
     }
 
     private void handleIntent(Intent intent) {
@@ -287,7 +276,7 @@ public class LightControlActivity extends AppCompatActivity {
             Volley.newRequestQueue(this).add(jsonObjectRequest);
 
         } catch (JSONException e) {
-            Log.d("zaneto", "salap");
+            Log.d("bach-prj", "salap");
         }
     }
 

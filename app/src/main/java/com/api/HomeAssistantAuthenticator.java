@@ -83,7 +83,7 @@ public class HomeAssistantAuthenticator {
                  data.put("grant_type", "refresh_token");
                  data.put("refresh_token", refresh_token);
                  data.put("client_id", client_id);
-                 Log.d("zaneto", "data: " + data + " endpoint: " + token_endpoint);
+                 Log.d("bach-prj", "data: " + data + " endpoint: " + token_endpoint);
 
                  // Making the POST request
                  GetTokenTask task = new GetTokenTask();
@@ -100,18 +100,18 @@ public class HomeAssistantAuthenticator {
                      newDate.setTime(exp);
                      access_token = token_response.optString("access_token");
                      refresh_token = access_token;
-                     Log.d("zaneto", "new refresh token granted: " + refresh_token);
+                     Log.d("bach-prj", "new refresh token granted: " + refresh_token);
                      returnString[0] = access_token;
                      returnString[1] = refresh_token;
                      returnString[2] = newDate.toString();
                  }
                  else {
-                     Log.d("zaneto", "failed to obtain new refresh tokens");
+                     Log.d("bach-prj", "failed to obtain new refresh tokens");
                  }
 
              }
              catch (Exception e) {
-                 Log.e("zaneto", "Error occurred: " + e);
+                 Log.e("bach-prj", "Error occurred: " + e);
              }
 //            }
 //        });
@@ -126,10 +126,10 @@ public class HomeAssistantAuthenticator {
             try {
                 // Making the POST request
                 JSONObject token_response = makePostRequest(token_endpoint, data);
-                Log.d("zaneto", "making post request in get refresh token was successful.");
+                Log.d("bach-prj", "making post request in get refresh token was successful.");
                 return token_response;
             } catch (Exception e) {
-                Log.e("zaneto", e.getMessage());
+                Log.e("bach-prj", e.getMessage());
                 return null;
             }
 
@@ -149,7 +149,7 @@ public class HomeAssistantAuthenticator {
             connection.setRequestMethod("POST");
             connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded");
             connection.setDoOutput(true);
-            Log.d("zaneto", "before send data in makePostRequest function");
+            Log.d("bach-prj", "before send data in makePostRequest function");
             // Write data to the connection output stream
             StringBuilder postData = new StringBuilder();
             for (Map.Entry<String, String> entry : data.entrySet()) {

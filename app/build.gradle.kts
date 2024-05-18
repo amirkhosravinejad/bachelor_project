@@ -43,18 +43,12 @@ dependencies {
     implementation(libs.material)
     // lottie animations
     implementation("com.airbnb.android:lottie:6.4.0")
-    // 2 libraries in order to have web connection
+    // 4 libraries in order to have web connection
     implementation("org.json:json:20211205")
     implementation("com.android.volley:volley:1.2.1")
-    //implementation(files("C:\\Users\\max\\Downloads\\jmdns\\jmdns.jar"))
-    //    implementation("org.xbill.DNS:jmdns:3.5.9")
-//    implementation("org.dhcpcd:dhcpcd-ui:1.0.5")
-
-    // library in java for supporting zeroconf protocol
-//    implementation(libs.jmdns)
     implementation("com.squareup.retrofit2:retrofit:2.11.0")
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
-    implementation(files("C:\\Users\\max\\Downloads\\jmdns-3.5.9.jar"))
+
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
