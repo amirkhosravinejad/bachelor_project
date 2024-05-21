@@ -8,15 +8,17 @@ import java.net.Socket;
 
 public class PortScanner {
     private final String localIPAddress;
-    public PortScanner (String IP){
-        this.localIPAddress = IP;
-    }
+    private final PortScanListener listener;
     public interface PortScanListener {
         String onPortOpen(String ipAddress);
         void onScanComplete();
     }
+    public PortScanner (String IP, PortScanListener listener){
+        this.localIPAddress = IP;
+        this.listener = listener;
+    }
 
-    public String scanPortOnNetwork(final int port, final PortScanListener listener) {
+    public String scanPortOnNetwork(final int port) {
         StringBuilder server_IP = new StringBuilder();
         new Thread(new Runnable() {
             @Override
@@ -37,7 +39,7 @@ public class PortScanner {
                         try {
                             Socket socket = new Socket();
                             Log.d("Port Scanner current address", ipAddress);
-                            socket.connect(new InetSocketAddress(ipAddress, port), 1000);
+                            socket.connect(new InetSocketAddress(ipAddress, port), 300);
                             socket.close();
                             if (listener != null) {
                                 server_IP.append(listener.onPortOpen(ipAddress));

@@ -178,9 +178,6 @@ public class HomeAssistantAuthenticator {
                 responseBuilder.append(line);
             }
             reader.close();
-
-
-
             // Convert response to JSON object
             return new JSONObject(responseBuilder.toString());
         } catch (IOException | JSONException e) {

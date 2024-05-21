@@ -6,10 +6,10 @@ import android.content.Intent;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.net.ConnectivityManager;
+import android.net.LinkAddress;
+import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkCapabilities;
-import android.net.wifi.WifiInfo;
-import android.net.wifi.WifiManager;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
@@ -24,6 +24,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.api.database.TokenDatabaseHelper;
 
+import java.net.Inet4Address;
 import java.net.InetAddress;
 import java.net.NetworkInterface;
 import java.net.Socket;
@@ -32,7 +33,8 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 
-public class FindServersActivity extends AppCompatActivity implements mDNSServiceDiscovery.OnHostnameListener {
+public class FindServersActivity extends AppCompatActivity implements
+        mDNSServiceDiscovery.OnHostnameListener, PortScanner.PortScanListener {
 
     private Button gotoLogin;
 
@@ -44,26 +46,16 @@ public class FindServersActivity extends AppCompatActivity implements mDNSServic
     private Handler handler;
     private String former_server_ip;
     private String refresh_t;
-
-    @Override
-    public void onHostnameFound(String hostname) {
-        Log.d("bach-prj", "host: " + hostname);
-        server_ip = hostname;
-        gotoLogin.setVisibility(View.VISIBLE);
-        searchAnimationView.setVisibility(View.INVISIBLE);
-    }
-    @Override
-    public void onHostnameNotFound() {
-        runPortScanner();
-        gotoLogin.setVisibility(View.VISIBLE);
-        searchAnimationView.setVisibility(View.INVISIBLE);
-    }
+    private TextView showFindingServers;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // initializing the widgets in the UI
         setContentView(R.layout.activity_find_servers);
         gotoLogin = findViewById(R.id.GotoLogin);
         searchAnimationView = findViewById(R.id.SearchAnimationView);
+        showFindingServers = findViewById(R.id.portScannerSearchTextView);
+
         gotoLogin.setVisibility(View.GONE);
         searchAnimationView.setVisibility(View.VISIBLE);
 
@@ -77,7 +69,7 @@ public class FindServersActivity extends AppCompatActivity implements mDNSServic
         // check if VPN active; if it's active, show the popup
         // and if it is not try to find Home Assistant server
         if (isVpnActive())
-            showVPNWarningPopup();
+            showVPNWarningPopup("Please make sure no VPN is on");
         else {
             checkIfTokenExists();
 //            find_HAServer();
@@ -100,8 +92,10 @@ public class FindServersActivity extends AppCompatActivity implements mDNSServic
             SQLiteDatabase db = dbhelper.getReadableDatabase();
             Cursor cursor = db.rawQuery("SELECT * FROM tokens", null);
             int count = cursor.getCount();
-            if (count == 0)
+            if (count == 0){
+                find_HAServer();
                 return;
+            }
             cursor.move(count);
             former_server_ip = cursor.getString(1);
             String access_t = cursor.getString(2);
@@ -110,6 +104,15 @@ public class FindServersActivity extends AppCompatActivity implements mDNSServic
             Log.d("bach-prj", "row " + cursor.getPosition() + " serverIP: " + former_server_ip +
                     " access token: " + access_t + " refresh token: " + refresh_t + " expiry : " + expiry);
 
+            String IP = getLocalIpAddress();
+            if (!IP.split("\\.")[0].equals(former_server_ip.split("\\.")[0]) ||
+                !IP.split("\\.")[1].equals(former_server_ip.split("\\.")[1]) ||
+                !IP.split("\\.")[2].equals(former_server_ip.split("\\.")[2])) {
+                Log.d("bach-prj",
+                        "current mobile IP is not in the same network with former server IP");
+                find_HAServer();
+                return;
+            }
             ConnectTask task = new ConnectTask();
             int return_ = task.execute().get();
 
@@ -126,6 +129,8 @@ public class FindServersActivity extends AppCompatActivity implements mDNSServic
             }
             else {
                 Log.d("bach-prj", "token not valid anymore!");
+                // if connection to the former server IP retrieved from database
+                // is ok (return_ == 0)
                 if (return_ == 0) {
                     TokenDatabaseHelper helper = new TokenDatabaseHelper(getApplicationContext());
                     helper.selectAllRows(helper.getReadableDatabase());
@@ -136,10 +141,18 @@ public class FindServersActivity extends AppCompatActivity implements mDNSServic
                         helper.selectAllRows(helper.getReadableDatabase());
                         intentToLightControl(token_row[1]);
                     }
-                    else{
+                    else {
+                        Log.d("bach-prj", "bad request: " + token_row[0] +
+                                token_row[1] + token_row[2]);
                         find_HAServer();
                     }
 
+                }
+                // if failed to connect to former Server IP
+                // return_ == 1
+                else {
+                    Log.d("bach-prj", "failed to connect to former server IP");
+                    find_HAServer();
                 }
             }
 
@@ -163,11 +176,11 @@ public class FindServersActivity extends AppCompatActivity implements mDNSServic
     private boolean isVpnActive() {
         ConnectivityManager connectivityManager = (ConnectivityManager)
                 this.getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
-        if (connectivityManager!= null) {
+        if (connectivityManager != null) {
             Network activeNetwork = connectivityManager.getActiveNetwork();
-            if (activeNetwork!= null) {
+            if (activeNetwork != null) {
                 NetworkCapabilities networkCapabilities = connectivityManager.getNetworkCapabilities(activeNetwork);
-                if (networkCapabilities!= null) {
+                if (networkCapabilities != null) {
                     return networkCapabilities.hasTransport(NetworkCapabilities.TRANSPORT_VPN);
                 }
             }
@@ -180,20 +193,36 @@ public class FindServersActivity extends AppCompatActivity implements mDNSServic
         Log.d("bach-prj", "we're in finally after try catch in findHAServer()");
     }
 
+    @Override
+    public void onHostnameFound(String hostname) {
+        Log.d("bach-prj", "Zeroconf discovery host: " + hostname);
+        server_ip = hostname;
+        gotoLogin.setVisibility(View.VISIBLE);
+        searchAnimationView.setVisibility(View.INVISIBLE);
+    }
+    @Override
+    public void onHostnameNotFound() {
+        Log.d("bach-prj", "Zeroconf discovery can't find service");
+        showFindingServers.setVisibility(View.VISIBLE);
+        showFindingServers.setText("Please wait for a few time to discover servers.");
+        runPortScanner();
+    }
+
     private String getLocalIpAddress() {
         try {
-            Context context = FindServersActivity.this.getApplicationContext();
+            ConnectivityManager connectivityManager = (ConnectivityManager)
+                    this.getApplicationContext().getSystemService(Context.CONNECTIVITY_SERVICE);
             // Get the IP address of the Wi-Fi connection
-            WifiManager wifiManager = (WifiManager) context.getApplicationContext().getSystemService(Context.WIFI_SERVICE);
-            WifiInfo wifiInfo = wifiManager.getConnectionInfo();
-            int ipAddress = wifiInfo.getIpAddress();
-
-            // Convert the IP address to a string
-            if (ipAddress!= 0) {
-                return InetAddress.getByAddress(new byte[]{(byte) (ipAddress & 0xff),
-                        (byte) ((ipAddress >> 8) & 0xff),
-                        (byte) ((ipAddress >> 16) & 0xff),
-                        (byte) ((ipAddress >> 24) & 0xff)}).getHostAddress();
+            LinkProperties linkProperties = connectivityManager.getLinkProperties
+                                            (connectivityManager.getActiveNetwork());
+            InetAddress inetAddress;
+            for (LinkAddress linkAddress : linkProperties.getLinkAddresses()) {
+                inetAddress = linkAddress.getAddress();
+                if (inetAddress instanceof Inet4Address && !inetAddress.isLoopbackAddress()
+                        && inetAddress.isSiteLocalAddress()) {
+                    Log.d("bach-prj", "in getLocal: " + inetAddress.getHostAddress());
+                    return inetAddress.getHostAddress();
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
@@ -205,11 +234,9 @@ public class FindServersActivity extends AppCompatActivity implements mDNSServic
             for (NetworkInterface intf : interfaces) {
                 if (intf.isUp())
                     Log.d("bach-prj", "interface name: " + intf.getDisplayName());
-                if (intf.getName().equalsIgnoreCase("wlan0") ||
-                        intf.getName().equalsIgnoreCase("swlan0")) {
-
-//                    byte[] ipAddr = intf.getInetAddresses().nextElement().getAddress();
-                    byte[] ipAddr = intf.getInterfaceAddresses().get(0).getAddress().getAddress();
+                if (intf.getName().equalsIgnoreCase("swlan0")) {
+                    byte[] ipAddr = intf.getInterfaceAddresses().get(1).getAddress().getAddress();
+                    Log.d("bach-prj", "salap: " + InetAddress.getByAddress(ipAddr).getHostAddress());
                     return InetAddress.getByAddress(ipAddr).getHostAddress();
                 }
             }
@@ -222,35 +249,35 @@ public class FindServersActivity extends AppCompatActivity implements mDNSServic
 
     private void runPortScanner() {
         String IP = getLocalIpAddress();
-        Log.d("bach-prj", IP);
-        PortScanner portScanner = new PortScanner(IP);
-        portScanner.scanPortOnNetwork(8123, new PortScanner.PortScanListener() {
-            @Override
-            public String onPortOpen(String ipAddress) {
-                Log.d("bach-prj", "Port 8123 is open on device with IP: " + ipAddress);
-                server_ip = ipAddress;
-                // Run UI updates on the main thread
-//                runOnUiThread(new Runnable() {
-//                    @Override
-//                    public void run() {
-//                        server_ip = ipAddress;
-////                        serverList.add(server_ip);
-////                        adapter.notifyDataSetChanged();
-//                    }
-//                });
-                return ipAddress;
-            }
-            @Override
-            public void onScanComplete() {
-                Log.d("bach-prj", "Port scan complete");
-            }
-
-        });
+        PortScanner portScanner = new PortScanner(IP, this);
+        portScanner.scanPortOnNetwork(8123);
     }
-    private void showVPNWarningPopup() {
+    @Override
+    public String onPortOpen(String ipAddress) {
+        Log.d("bach-prj", "Port 8123 is open on device with IP: " + ipAddress);
+        server_ip = ipAddress;
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                Log.d("bach-prj", "arze adab");
+                showFindingServers.setVisibility(View.INVISIBLE);
+                searchAnimationView.setVisibility(View.INVISIBLE);
+                gotoLogin.setVisibility(View.VISIBLE);
+            }
+        });
+        return ipAddress;
+    }
+    @Override
+    public void onScanComplete() {
+        Log.d("bach-prj", "Port scan complete");
+        showVPNWarningPopup("Server not found!");
+        searchAnimationView.setVisibility(View.INVISIBLE);
+    }
+
+    private void showVPNWarningPopup(String messageToShow) {
         AlertDialog.Builder builder = new AlertDialog.Builder(this);
         builder.setTitle("Warning")
-                .setMessage("Please make sure no VPN is on.")
+                .setMessage(messageToShow)
                 .setPositiveButton("OK", new DialogInterface.OnClickListener() {
                     @Override
                     public void onClick(DialogInterface dialog, int which) {
@@ -293,5 +320,6 @@ public class FindServersActivity extends AppCompatActivity implements mDNSServic
         // Don't forget to stop the HandlerThread when the activity is destroyed
         handlerThread.quitSafely();
     }
+
 }
 

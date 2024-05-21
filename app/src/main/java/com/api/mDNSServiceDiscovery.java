@@ -76,6 +76,7 @@ public class mDNSServiceDiscovery {
         public void onStartDiscoveryFailed(String serviceType, int errorCode) {
             // Discovery failed to start
             Log.d(TAG, "discovery start failed! error code: " + errorCode);
+            listener.onHostnameNotFound();
         }
 
         @Override
