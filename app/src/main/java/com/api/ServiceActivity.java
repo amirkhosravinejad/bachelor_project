@@ -3,7 +3,6 @@ package com.api;
 import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
-import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.Switch;
 import android.widget.TextView;
@@ -14,8 +13,6 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.android.volley.AuthFailureError;
 import com.android.volley.Request;
-import com.android.volley.Response;
-import com.android.volley.VolleyError;
 import com.android.volley.toolbox.JsonObjectRequest;
 import com.android.volley.toolbox.Volley;
 import com.api.datamodel.AutomationData;
@@ -38,13 +35,12 @@ import retrofit2.http.Header;
 import retrofit2.http.POST;
 import retrofit2.http.Path;
 
-public class LightControlActivity extends AppCompatActivity {
+public class ServiceActivity extends AppCompatActivity {
     private String server_ip, token;
     private static final String TAG = "bach-prj";
     private Switch lightSwitch;
     private TextView lightStatusLabel;
     private String lightState = "off";
-    private WebView automationsWebView;
     private Button SunsetButton, SunriseButton;
     public interface ApiService {
         @POST("api/config/automation/config/{randomNumber}")
@@ -58,13 +54,6 @@ public class LightControlActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_light_control);
         handleIntent(getIntent());
-//        initWebView();
-//        android.net.wifi.WifiManager wifi =
-//                (android.net.wifi.WifiManager)
-//                        getSystemService(android.content.Context.WIFI_SERVICE);
-//        WifiManager.MulticastLock lock = wifi.createMulticastLock("Multicast-lock");
-//        lock.setReferenceCounted(true);
-//        lock.acquire();
 
         // Initialize UI elements
         lightSwitch = findViewById(R.id.lightSwitch);
@@ -118,8 +107,7 @@ public class LightControlActivity extends AppCompatActivity {
             offset = "+00:30:00";
             service = "light.turn_off";
         }
-//        postAutomationData(baseURl, event, offset, service, alias);
-         AutomationData data = setAutomationData(event, offset, service, alias);
+        AutomationData data = setAutomationData(event, offset, service, alias);
         postAutomationData(baseURl, data);
     }
 
@@ -132,8 +120,9 @@ public class LightControlActivity extends AppCompatActivity {
 
         AutomationData.Action action = new AutomationData().new Action();
         action.setService(service);
-        // Assuming you have a way to set the data object, otherwise, you can leave it as null or an empty object
-        action.setData(null);
+        AutomationData.Action.Target target = new AutomationData().new Action().new Target();
+        target.setEntity_id("light.virtual_light_1");
+        action.setData(target);
 
         AutomationData automationData = new AutomationData();
         // Set properties of automationData here
@@ -187,31 +176,22 @@ public class LightControlActivity extends AppCompatActivity {
           String checkExistenceURL = String.format(url, server_ip, entity_id);
           JsonObjectRequest checkExistenceRequest = new JsonObjectRequest(
                   checkExistenceURL,
-                  new Response.Listener<JSONObject>() {
-
-                      @Override
-                      public void onResponse(JSONObject jsonObject) {
-                          try {
-                              JSONObject attrs = (JSONObject) jsonObject.get("attributes");
-                              Integer id = (Integer) attrs.get("id");
-                              if (randomNumber == id){
-                                  Log.d(TAG, "random number "+ randomNumber + "exists");
-                                  found[0] = true;
-                              }
-
-                          } catch (Exception e) {
-                              Log.d(TAG, "some exception occurred.");
-                              found[0] = false;
+                  jsonObject -> {
+                      try {
+                          JSONObject attrs = (JSONObject) jsonObject.get("attributes");
+                          Integer id = (Integer) attrs.get("id");
+                          if (randomNumber == id){
+                              Log.d(TAG, "random number "+ randomNumber + "exists");
+                              found[0] = true;
                           }
 
-                      }
-                  },
-                  new Response.ErrorListener() {
-                      @Override
-                      public void onErrorResponse(VolleyError volleyError) {
+                      } catch (Exception e) {
+                          Log.d(TAG, "some exception occurred.");
                           found[0] = false;
                       }
-                  }
+
+                  },
+                  volleyError -> found[0] = false
           ){
               @Override
               public Map<String, String> getHeaders() throws AuthFailureError {
@@ -241,25 +221,19 @@ public class LightControlActivity extends AppCompatActivity {
                     Request.Method.POST,
                     lightControlUrl,
                     requestData,
-                    new Response.Listener<JSONObject>() {
-                        @Override
-                        public void onResponse(JSONObject response) {
-                            // Handle successful response
-                            Log.d(TAG, "Response: " + response.toString());
-                            String success_message = "Light turned " + lightState + " successfully";
-                            Toast.makeText(LightControlActivity.this, success_message, Toast.LENGTH_SHORT).show();
-                        }
+                    response -> {
+                        // Handle successful response
+                        Log.d(TAG, "Response: " + response.toString());
+                        String success_message = "Light turned " + lightState + " successfully";
+                        Toast.makeText(ServiceActivity.this, success_message, Toast.LENGTH_SHORT).show();
                     },
-                    new Response.ErrorListener() {
-                        @Override
-                        public void onErrorResponse(VolleyError error) {
-                            // Handle error response
-                            String errorCause = Objects.requireNonNull(error.getCause()).toString();
-                            if (!checkIfJSONArrayException(errorCause)) {
-                                Log.e(TAG, "Error: " + error);
-                                String failed_message = "Failed to turn " + lightState + " the light";
-                                Toast.makeText(LightControlActivity.this, failed_message, Toast.LENGTH_SHORT).show();
-                            }
+                    error -> {
+                        // Handle error response
+                        String errorCause = Objects.requireNonNull(error.getCause()).toString();
+                        if (!checkIfJSONArrayException(errorCause)) {
+                            Log.e(TAG, "Error: " + error);
+                            String failed_message = "Failed to turn " + lightState + " the light";
+                            Toast.makeText(ServiceActivity.this, failed_message, Toast.LENGTH_SHORT).show();
                         }
                     }
             ){
@@ -283,7 +257,7 @@ public class LightControlActivity extends AppCompatActivity {
     private Boolean checkIfJSONArrayException(String errorCause) {
         if (errorCause.contains("type org.json.JSONArray cannot be converted to JSONObject")){
             String success_message = "Light turned " + lightState + " successfully";
-            Toast.makeText(LightControlActivity.this, success_message, Toast.LENGTH_SHORT).show();
+            Toast.makeText(ServiceActivity.this, success_message, Toast.LENGTH_SHORT).show();
             return true;
         }
         return false;

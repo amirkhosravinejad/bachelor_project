@@ -1,5 +1,6 @@
 package com.api;
 
+import android.content.ContentValues;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -18,7 +19,7 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import com.api.database.TokenDatabaseHelper;
 
-public class MainActivity extends AppCompatActivity {
+public class LoginActivity extends AppCompatActivity {
     private static final String TAG = "bach-prj";
     private static final String AUTH_CALLBACK_URL = "http://127.0.0.1:5000/hass/auth_callback";
     private static final String AUTH_URL_FORMAT = "http://%s:8123/auth/authorize?client_id=http://127.0.0.1:5000&redirect_uri=%s";
@@ -55,39 +56,41 @@ public class MainActivity extends AppCompatActivity {
                     String code = uri.getQueryParameter("code");
                     authenticate_HA(code);
                     Log.d(TAG, "Auth code: " + code);
-                    // Handle the authorization code here
                     return true;
                 }
                 return false;
             }
         });
 
+
         WebSettings webSettings = webView.getSettings();
         webSettings.setJavaScriptEnabled(true);
     }
 
     private void authenticate_HA(String auth_code){
-        HomeAssistantAuthenticator authenticator = new HomeAssistantAuthenticator();
+        HA_Authenticator authenticator = new HA_Authenticator();
         authenticator.authenticate(serverIP, auth_code,
-                new HomeAssistantAuthenticator.AuthenticationListener() {
-                    @Override
-                    public void onAuthenticationSuccess(String access_token, String refresh_token, String expiry_time) {
-                        // Authentication successful, token received
-                        Log.d("bach-prj", "Authentication successful. Access token: " + access_token
-                        + " refresh token: " + refresh_token + " expire: " + expiry_time);
-                        try (TokenDatabaseHelper databaseHelper =
-                                     new TokenDatabaseHelper(MainActivity.this.getApplicationContext())) {
-                            databaseHelper.insertTokens(serverIP, access_token, refresh_token, expiry_time);
-                        }
-                        onSuccessfulToken(access_token);
+            new HA_Authenticator.AuthenticationListener() {
+                @Override
+                public void onAuthenticationSuccess(String access_token, String refresh_token, String expiry_time) {
+                    // Authentication successful, token received
+                    Log.d("bach-prj", "Authentication successful. Access token: "
+                            + access_token + " refresh token: " + refresh_token + " expire: " + expiry_time);
+                    try (TokenDatabaseHelper databaseHelper =
+                                 new TokenDatabaseHelper(LoginActivity.this.getApplicationContext())) {
+                        ContentValues values = new ContentValues();
+                        databaseHelper.setDbWriter(databaseHelper.getWritableDatabase());
+                        databaseHelper.insertTokens(values, serverIP, access_token, refresh_token, expiry_time);
                     }
-
-                    @Override
-                    public void onAuthenticationFailure(String errorMessage) {
-                        // Authentication failed
-                        Log.e("bach-prj", "Authentication failed: " + errorMessage);
-                    }
-                });
+                    onSuccessfulToken(access_token);
+                }
+                @Override
+                public void onAuthenticationFailure(String errorMessage) {
+                    // Authentication failed
+                    Log.e("bach-prj", "Authentication failed: " + errorMessage);
+                }
+            }
+        );
     }
 
     private void onSuccessfulToken(String token) {
@@ -98,7 +101,8 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void run() {
                 progressBar.setVisibility(View.GONE);
-                Intent toLightControlActivity = new Intent(MainActivity.this, LightControlActivity.class);
+                Intent toLightControlActivity = new Intent(LoginActivity.this,
+                        ServiceActivity.class);
                 toLightControlActivity.putExtra("token", token);
                 toLightControlActivity.putExtra("server_ip", serverIP);
                 startActivity(toLightControlActivity);

@@ -32,18 +32,14 @@ public class mDNSServiceDiscovery {
             discoveryCompleted = false; // Reset the flag since discovery might still find services
             checkTimeoutAfterServiceDiscovery(); // Start the timeout
         }
-
         @Override
         public void onServiceFound(NsdServiceInfo service) {
-            // A service was found Do something with it!
-            // A service was found
-            // Initiate service resolution here
+            // A service was found so we initiate service resolution here
             nsdManager.resolveService(service, new NsdManager.ResolveListener() {
                 @Override
                 public void onResolveFailed(NsdServiceInfo nsdServiceInfo, int i) {
                     Log.d(TAG, "Resolve failed");
                 }
-
                 @Override
                 public void onServiceResolved(NsdServiceInfo serviceInfo) {
                     // Service resolved successfully
@@ -54,37 +50,23 @@ public class mDNSServiceDiscovery {
                     Log.d(TAG, "Port: " + port);
                     discoveryCompleted = true; // Mark discovery as completed
                 }
-
             });
         }
-
         @Override
         public void onServiceLost(NsdServiceInfo service) {
-            // A service was lost; update state as necessary
             Log.d(TAG, "service lost ");
             discoveryCompleted = true; // Mark discovery as completed
             listener.onHostnameNotFound();
         }
-
         @Override
-        public void onDiscoveryStopped(String serviceType) {
-            // Discovery has stopped
-            Log.d(TAG, "discovery stopped " + serviceType);
-        }
-
+        public void onDiscoveryStopped(String serviceType) {Log.d(TAG, "discovery stopped " + serviceType);}
         @Override
         public void onStartDiscoveryFailed(String serviceType, int errorCode) {
-            // Discovery failed to start
             Log.d(TAG, "discovery start failed! error code: " + errorCode);
             listener.onHostnameNotFound();
         }
-
         @Override
-        public void onStopDiscoveryFailed(String serviceType, int errorCode) {
-            // Discovery failed to stop
-            Log.d(TAG, "discovery stop failed! error code" + errorCode);
-        }
-
+        public void onStopDiscoveryFailed(String serviceType, int errorCode) {Log.d(TAG, "discovery stop failed! error code" + errorCode);}
     };
 
     private void checkTimeoutAfterServiceDiscovery(){

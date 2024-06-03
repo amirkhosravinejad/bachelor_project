@@ -50,6 +50,7 @@ dependencies {
     implementation("com.squareup.retrofit2:converter-gson:2.11.0")
 
     testImplementation(libs.junit)
+    testImplementation(libs.mockito)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
 }

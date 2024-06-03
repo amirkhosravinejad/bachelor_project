@@ -1,16 +1,14 @@
 package com.api;
 
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
-import android.database.Cursor;
-import android.database.sqlite.SQLiteDatabase;
 import android.net.ConnectivityManager;
 import android.net.LinkAddress;
 import android.net.LinkProperties;
 import android.net.Network;
 import android.net.NetworkCapabilities;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.HandlerThread;
@@ -26,27 +24,24 @@ import com.api.database.TokenDatabaseHelper;
 
 import java.net.Inet4Address;
 import java.net.InetAddress;
-import java.net.NetworkInterface;
-import java.net.Socket;
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.Collections;
 import java.util.Date;
-import java.util.List;
 
 public class FindServersActivity extends AppCompatActivity implements
         mDNSServiceDiscovery.OnHostnameListener, PortScanner.PortScanListener {
-
     private Button gotoLogin;
-
     private TextView welcomeMessage;
-
     private View searchAnimationView;
-    private String server_ip;
-    private HandlerThread handlerThread;
-    private Handler handler;
     private String former_server_ip;
     private String refresh_t;
     private TextView showFindingServers;
+    private HandlerThread handlerThread;
+    private Handler handler;
+    private String server_ip;
+    private boolean connectedToServer;
+    private String expiry, access_t;
+    private int count;
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -58,9 +53,6 @@ public class FindServersActivity extends AppCompatActivity implements
 
         gotoLogin.setVisibility(View.GONE);
         searchAnimationView.setVisibility(View.VISIBLE);
-
-        // Initially hide the Button
-        findViewById(R.id.GotoLogin).setVisibility(View.GONE);
 
         // Show the welcome message
         welcomeMessage = findViewById(R.id.welcomeMessage);
@@ -74,101 +66,106 @@ public class FindServersActivity extends AppCompatActivity implements
             checkIfTokenExists();
 //            find_HAServer();
         }
-
-
         gotoLogin.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                Intent toMain = new Intent(FindServersActivity.this, MainActivity.class);
-                toMain.putExtra("server_ip", server_ip);
-                // Start MainActivity
-                startActivity(toMain);
+                Intent toLogin = new Intent(FindServersActivity.this, LoginActivity.class);
+                toLogin.putExtra("server_ip", server_ip);
+                // Start LoginActivity
+                startActivity(toLogin);
             }
         });
     }
 
-    private void checkIfTokenExists(){
+    @Override
+    protected void onResume() {
+        super.onResume();
+
+    }
+
+    private void checkIfTokenExists() {
         try (TokenDatabaseHelper dbhelper = new TokenDatabaseHelper(this.getApplicationContext())) {
-            SQLiteDatabase db = dbhelper.getReadableDatabase();
-            Cursor cursor = db.rawQuery("SELECT * FROM tokens", null);
-            int count = cursor.getCount();
-            if (count == 0){
-                find_HAServer();
-                return;
-            }
-            cursor.move(count);
-            former_server_ip = cursor.getString(1);
-            String access_t = cursor.getString(2);
-            refresh_t = cursor.getString(3);
-            String expiry = cursor.getString(4);
-            Log.d("bach-prj", "row " + cursor.getPosition() + " serverIP: " + former_server_ip +
-                    " access token: " + access_t + " refresh token: " + refresh_t + " expiry : " + expiry);
-
-            String IP = getLocalIpAddress();
-            if (!IP.split("\\.")[0].equals(former_server_ip.split("\\.")[0]) ||
-                !IP.split("\\.")[1].equals(former_server_ip.split("\\.")[1]) ||
-                !IP.split("\\.")[2].equals(former_server_ip.split("\\.")[2])) {
-                Log.d("bach-prj",
-                        "current mobile IP is not in the same network with former server IP");
-                find_HAServer();
-                return;
-            }
-            ConnectTask task = new ConnectTask();
-            int return_ = task.execute().get();
-
-            // check if Access Token is still valid or not;
-            // if expired, we should get refresh token
-            // and if it's still valid, we can pass Login and authorization phase.
-            SimpleDateFormat formatter = new SimpleDateFormat("E MMM dd HH:mm:ss 'GMT+03:30' yyyy");
-            Date expiryDate = formatter.parse(expiry);
-            Date new_date = new Date();
-            Log.d("bach-prj", "expiry date: " + expiryDate + " now: " + new_date);
-            if (new_date.before(expiryDate)){
-                Log.d("bach-prj", "token still valid");
-                intentToLightControl(access_t);
+            String[] fetchedServerToken = dbhelper.fetchLastRow(dbhelper);
+            if (fetchedServerToken != null) {
+                former_server_ip = fetchedServerToken[0];
+                access_t = fetchedServerToken[1];
+                refresh_t = fetchedServerToken[2];
+                expiry = fetchedServerToken[3];
+                count = Integer.parseInt(fetchedServerToken[4]);
             }
             else {
-                Log.d("bach-prj", "token not valid anymore!");
-                // if connection to the former server IP retrieved from database
-                // is ok (return_ == 0)
-                if (return_ == 0) {
-                    TokenDatabaseHelper helper = new TokenDatabaseHelper(getApplicationContext());
-                    helper.selectAllRows(helper.getReadableDatabase());
-                    HomeAssistantAuthenticator authenticator = new HomeAssistantAuthenticator();
-                    String[] token_row = authenticator.getRefreshToken(former_server_ip, refresh_t);
-                    if (token_row[0] != null && token_row[1] != null && token_row[2] != null){
-                        helper.updateRow(count, token_row[0], token_row[1], token_row[2]);
-                        helper.selectAllRows(helper.getReadableDatabase());
-                        intentToLightControl(token_row[1]);
-                    }
-                    else {
-                        Log.d("bach-prj", "bad request: " + token_row[0] +
-                                token_row[1] + token_row[2]);
-                        find_HAServer();
-                    }
-
-                }
-                // if failed to connect to former Server IP
-                // return_ == 1
-                else {
-                    Log.d("bach-prj", "failed to connect to former server IP");
-                    find_HAServer();
-                }
+                find_HAServer();
+                return;
             }
+            connectToFormerIP();
 
-        } catch (Exception e){
-            // if there is an exception, means socket is not connected,
-            // so we should find HA servers again.
+        } catch (Exception e) {
+            // if there is an exception in the token extraction phase,
+            // we should try to find HA servers and the former IPs not working.
             Log.e("bach-prj", e.toString());
             find_HAServer();
         }
     }
+    private void connectToFormerIP() {
+        String IP = getLocalIpAddress();
+        assert IP != null;
+        if (!IP.split("\\.")[0].equals(former_server_ip.split("\\.")[0]) ||
+                !IP.split("\\.")[1].equals(former_server_ip.split("\\.")[1]) ||
+                !IP.split("\\.")[2].equals(former_server_ip.split("\\.")[2])) {
+            Log.d("bach-prj",
+                    "current mobile IP is not in the same network with former server IP");
+            find_HAServer();
+        }
+        runPortScanner(former_server_ip);
+    }
+
+    private boolean checkValidityOfToken(String expiry) {
+        SimpleDateFormat formatter = new SimpleDateFormat("E MMM dd HH:mm:ss 'GMT+03:30' yyyy");
+        Date expiryDate;
+        try {
+            expiryDate = formatter.parse(expiry);
+        } catch (ParseException e) {
+            throw new RuntimeException(e);
+        }
+        Date new_date = new Date();
+        Log.d("bach-prj", "expiry date: " + expiryDate + " now: " + new_date);
+        if (new_date.before(expiryDate)) {
+            Log.d("bach-prj", "token still valid");
+            return true;
+        }
+        Log.d("bach-prj", "token not valid anymore!");
+        return false;
+    }
+
+    private void updateTokensInTable(int index) {
+        try (TokenDatabaseHelper helper = new TokenDatabaseHelper(getApplicationContext())) {
+            helper.setDbReader(helper.getReadableDatabase());
+            helper.selectAllRows();
+            HA_Authenticator authenticator = new HA_Authenticator();
+            String[] token_row = authenticator.getRefreshToken(former_server_ip, refresh_t);
+            // if obtaining refresh token was successful
+            if (token_row[0] != null && token_row[1] != null && token_row[2] != null) {
+                helper.setDbWriter(helper.getWritableDatabase());
+                helper.updateRow(new ContentValues(), index, token_row[0], token_row[1], token_row[2]);
+                helper.selectAllRows();
+                intentToLightControl(token_row[1]);
+            }
+            // if failed to get refresh token
+            else {
+                Log.d("bach-prj", "bad request: " + token_row[0] + token_row[1] + token_row[2]);
+                find_HAServer();
+            }
+        }
+        catch (Exception e) {
+            Log.d("bach-prj", "refresh token exception: " + e);
+        }
+    }
 
     private void intentToLightControl(String access_token) {
-        Intent toLightControl = new Intent(FindServersActivity.this, LightControlActivity.class);
+        Intent toLightControl = new Intent(FindServersActivity.this, ServiceActivity.class);
         toLightControl.putExtra("server_ip", former_server_ip);
         toLightControl.putExtra("token", access_token);
-        // Start LightControlActivity
+        // Start ServiceActivity
         startActivity(toLightControl);
     }
 
@@ -191,21 +188,33 @@ public class FindServersActivity extends AppCompatActivity implements
     private void find_HAServer() {
         mDNSServiceDiscovery mDNSDiscovery = new mDNSServiceDiscovery(this, this);
         Log.d("bach-prj", "we're in finally after try catch in findHAServer()");
+//        runPortScanner(null);
     }
 
     @Override
     public void onHostnameFound(String hostname) {
         Log.d("bach-prj", "Zeroconf discovery host: " + hostname);
         server_ip = hostname;
-        gotoLogin.setVisibility(View.VISIBLE);
-        searchAnimationView.setVisibility(View.INVISIBLE);
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                gotoLogin.setVisibility(View.VISIBLE);
+                searchAnimationView.setVisibility(View.INVISIBLE);
+            }
+        });
+
     }
     @Override
     public void onHostnameNotFound() {
         Log.d("bach-prj", "Zeroconf discovery can't find service");
-        showFindingServers.setVisibility(View.VISIBLE);
-        showFindingServers.setText("Please wait for a few time to discover servers.");
-        runPortScanner();
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                showFindingServers.setVisibility(View.VISIBLE);
+                showFindingServers.setText("Please wait for a few time to discover servers.");
+            }
+        });
+        runPortScanner(null);
     }
 
     private String getLocalIpAddress() {
@@ -216,6 +225,7 @@ public class FindServersActivity extends AppCompatActivity implements
             LinkProperties linkProperties = connectivityManager.getLinkProperties
                                             (connectivityManager.getActiveNetwork());
             InetAddress inetAddress;
+            assert linkProperties != null;
             for (LinkAddress linkAddress : linkProperties.getLinkAddresses()) {
                 inetAddress = linkAddress.getAddress();
                 if (inetAddress instanceof Inet4Address && !inetAddress.isLoopbackAddress()
@@ -227,30 +237,16 @@ public class FindServersActivity extends AppCompatActivity implements
         } catch (Exception e) {
             e.printStackTrace();
         }
-
-        // If Wi-Fi is not available, try to get the IP address from the mobile data connection
-        try {
-            List<NetworkInterface> interfaces = Collections.list(NetworkInterface.getNetworkInterfaces());
-            for (NetworkInterface intf : interfaces) {
-                if (intf.isUp())
-                    Log.d("bach-prj", "interface name: " + intf.getDisplayName());
-                if (intf.getName().equalsIgnoreCase("swlan0")) {
-                    byte[] ipAddr = intf.getInterfaceAddresses().get(1).getAddress().getAddress();
-                    Log.d("bach-prj", "salap: " + InetAddress.getByAddress(ipAddr).getHostAddress());
-                    return InetAddress.getByAddress(ipAddr).getHostAddress();
-                }
-            }
-        } catch (Exception ex) {
-            ex.printStackTrace();
-        }
-
         return null;
     }
-
-    private void runPortScanner() {
+    private void runPortScanner(String cachedServerIP) {
         String IP = getLocalIpAddress();
         PortScanner portScanner = new PortScanner(IP, this);
-        portScanner.scanPortOnNetwork(8123);
+        Log.d("bach-prj", "on runPortScanner cached IP: " + cachedServerIP);
+        if (cachedServerIP == null)
+            portScanner.scanPortOnNetwork(8123);
+        else
+           portScanner.onlyConnect(cachedServerIP, 8123);
     }
     @Override
     public String onPortOpen(String ipAddress) {
@@ -265,13 +261,35 @@ public class FindServersActivity extends AppCompatActivity implements
                 gotoLogin.setVisibility(View.VISIBLE);
             }
         });
+
         return ipAddress;
     }
     @Override
     public void onScanComplete() {
         Log.d("bach-prj", "Port scan complete");
-        showVPNWarningPopup("Server not found!");
-        searchAnimationView.setVisibility(View.INVISIBLE);
+        this.runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                showVPNWarningPopup("Server not found!");
+                showFindingServers.setVisibility(View.INVISIBLE);
+                searchAnimationView.setVisibility(View.INVISIBLE);
+            }
+        });
+    }
+
+    @Override
+    public void onConnect() {
+        Log.d("bach-prj", "connection to former server IP was successful");
+        if (checkValidityOfToken(expiry))
+            intentToLightControl(access_t);
+        else
+            updateTokensInTable(count);
+    }
+
+    @Override
+    public void cannotConnect() {
+        Log.d("bach-prj", "failed to connect to former server IP");
+        find_HAServer();
     }
 
     private void showVPNWarningPopup(String messageToShow) {
@@ -288,32 +306,6 @@ public class FindServersActivity extends AppCompatActivity implements
         AlertDialog dialog = builder.create();
         dialog.show();
     }
-
-
-    private class ConnectTask extends AsyncTask<Void, Void, Integer> {
-        private int isConnectedToFormerIP = -1;
-        @Override
-        protected Integer doInBackground(Void... voids) {
-            try {
-                Socket socket = new Socket(former_server_ip, 8123);
-                socket.setSoTimeout(2000);
-                socket.close();
-                Log.d("bach-prj", "connection to former server IP was successful.");
-                return 0;
-            } catch (Exception e) {
-                Log.e("bach-prj", e.getMessage());
-                return 1;
-            }
-
-        }
-        @Override
-        protected void onPostExecute(Integer result) {
-            super.onPostExecute(result);
-            isConnectedToFormerIP = result;
-        }
-
-    }
-
     @Override
     protected void onDestroy() {
         super.onDestroy();

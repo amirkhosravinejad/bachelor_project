@@ -17,7 +17,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-public class HomeAssistantAuthenticator {
+public class HA_Authenticator {
 
     private String access_token;
     private String refresh_token;
@@ -26,10 +26,6 @@ public class HomeAssistantAuthenticator {
     public interface AuthenticationListener {
         void onAuthenticationSuccess(String access_token, String refresh_token, String expiry_time);
         void onAuthenticationFailure(String errorMessage);
-    }
-
-    public interface RefreshTokenListener {
-
     }
 
     public void authenticate(String ipAddress, String auth_code, final AuthenticationListener listener) {

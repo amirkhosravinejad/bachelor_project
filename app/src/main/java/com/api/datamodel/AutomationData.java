@@ -100,10 +100,23 @@ public class AutomationData {
         }
     }
     public class Action {
+        public class Target {
+            @SerializedName("entity_id")
+            private String entity_id;
+
+            public String getEntity_id() {
+                return entity_id;
+            }
+
+            public void setEntity_id(String entity_id) {
+                this.entity_id = entity_id;
+            }
+        }
+
         @SerializedName("service")
         private String service;
         @SerializedName("data")
-        private Object data; // Assuming data is an object with no specific structure
+        private Target data; // Assuming data is an object with no specific structure
 
         // Getters and Setters
         public void setService(String service) {
@@ -114,11 +127,11 @@ public class AutomationData {
             return service;
         }
 
-        public void setData(Object data) {
+        public void setData(Target data) {
             this.data = data;
         }
 
-        public Object getData() {
+        public Target getData() {
             return data;
         }
     }
